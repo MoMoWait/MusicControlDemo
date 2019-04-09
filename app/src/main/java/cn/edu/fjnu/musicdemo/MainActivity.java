@@ -1,16 +1,16 @@
 package cn.edu.fjnu.musicdemo;
-
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
-import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.Handler;
 import android.provider.Settings;
+import android.support.annotation.RequiresApi;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.media.MediaDescriptionCompat;
 import android.support.v4.media.MediaMetadataCompat;
@@ -23,14 +23,18 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements MediaSessionManager.OnActiveSessionsChangedListener {
+@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+public class MainActivity extends AppCompatActivity implements MediaSessionManager.OnActiveSessionsChangedListener, OnControlClick {
     final String TAG = "MainActivity";
     private RecyclerView mRvMusicBrowser;
     private NotifyReceiver mNotifyReceiver = new NotifyReceiver();
+    private MusicActionReceiver musicActionReceiver = new MusicActionReceiver();
     private Handler mHandler = new Handler();
     private MediaSessionManager mediaSessionManager;
     private ComponentName mNotifyReceiveService;
@@ -72,6 +76,94 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
     public void onActiveSessionsChanged(List<MediaController> controllers) {
         loadMusicControlAdapter();
     }
+
+    @Override
+    public void onClick(View view) {
+        Log.i(TAG, "onClick");
+        switch (view.getId()){
+            case R.id.iv_last_music:
+                lastMusic((MusicInfo) view.getTag());
+                break;
+            case R.id.iv_next_music:
+                nexMusic((MusicInfo) view.getTag());
+                break;
+            case R.id.iv_play_pause:
+                playOrPause((MusicInfo) view.getTag());
+                break;
+        }
+    }
+
+    private void nexMusic(MusicInfo musicInfo){
+        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+        if(controllerCompat != null){
+            Log.i(TAG, "nextMusic->pkgName:" + controllerCompat.getPackageName());
+            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN));
+            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_UP));
+            boolean isSucc = isDown && isUp;
+            if(!isSucc){
+                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+                if(transportControls != null)
+                    transportControls.skipToNext();
+            }
+        }
+    }
+
+
+    private void lastMusic(MusicInfo musicInfo){
+        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+        if(controllerCompat != null){
+            Log.i(TAG, "lastMusic->pkgName:" + controllerCompat.getPackageName());
+            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_DOWN));
+            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_UP));
+            boolean isSucc = isDown && isUp;
+            if(!isSucc){
+                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+                if(transportControls != null)
+                    transportControls.skipToPrevious();
+            }
+        }
+    }
+
+
+    private void playOrPause(MusicInfo musicInfo){
+        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+        boolean isPlay = musicInfo.isMusicState();
+        //int keyCode = isPlay ? KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
+        if(controllerCompat != null){
+            Log.i(TAG, "playOrPause->pkgName:" + controllerCompat.getPackageName());
+            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN));
+            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP));
+            boolean isSucc = isDown && isUp;
+            if(!isSucc){
+                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+                if(transportControls != null){
+                    if(isPlay)
+                        transportControls.pause();
+                    else
+                        transportControls.play();
+                }
+
+            }
+        }
+    }
+
+
+
+    public MediaControllerCompat findMediaControl(MusicInfo musicInfo){
+        List<MediaController> mediaControllers = mediaSessionManager.getActiveSessions(mNotifyReceiveService);
+        for(MediaController controller : mediaControllers){
+            try{
+                MediaControllerCompat controllerCompat = new MediaControllerCompat(this, MediaSessionCompat.Token.fromToken(controller.getSessionToken()));
+                if(musicInfo.getPkgName().equals(controllerCompat.getPackageName()))
+                    return controllerCompat;
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+
+        }
+        return null;
+    }
+
 
     /**
      * 检测通知权限
@@ -132,7 +224,10 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
                     try{
                         MediaControllerCompat controllerCompat = new MediaControllerCompat(this, MediaSessionCompat.Token.fromToken(controller.getSessionToken()));
                         MusicInfo itemMusicInfo = new MusicInfo();
-                        itemMusicInfo.setAppName(controllerCompat.getPackageName());
+                        String pkgName = controllerCompat.getPackageName();
+                        ApplicationInfo applicationInfo = getPackageManager().getApplicationInfo(pkgName, 0);
+                        itemMusicInfo.setAppName(applicationInfo.loadLabel(getPackageManager()).toString());
+                        itemMusicInfo.setPkgName(pkgName);
                         PlaybackStateCompat playbackStateCompat = controllerCompat.getPlaybackState();
                         itemMusicInfo.setMusicState(playbackStateCompat != null && playbackStateCompat.getState() == PlaybackStateCompat.STATE_PLAYING);
                         itemMusicInfo.setTitle("");
@@ -140,9 +235,9 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
                         if(mediaMetadataCompat != null){
                             MediaDescriptionCompat descriptionCompat = mediaMetadataCompat.getDescription();
                             if(descriptionCompat != null){
-                                String musicTitle = descriptionCompat.getTitle().toString();
+                                CharSequence musicTitle = descriptionCompat.getTitle();
                                 if(!TextUtils.isEmpty(musicTitle))
-                                    itemMusicInfo.setTitle(musicTitle);
+                                    itemMusicInfo.setTitle(musicTitle.toString());
                             }
                         }
                         musicInfos.add(itemMusicInfo);
@@ -151,7 +246,7 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
                         e.printStackTrace();
                     }
                 }
-                mRvMusicBrowser.setAdapter(new ControlAdapter(this, musicInfos));
+                mRvMusicBrowser.setAdapter(new ControlAdapter(this, musicInfos, this));
             }
 
         }
@@ -189,7 +284,7 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
         musicActionFilter.addAction("com.oppo.music.service.playstate_changed");
         musicActionFilter.addAction("com.miui.player.metachanged");
         musicActionFilter.addAction("com.miui.player.queuechanged");
-        registerReceiver(mNotifyReceiver, musicActionFilter);
+        registerReceiver(musicActionReceiver, musicActionFilter);
     }
 
     /**
@@ -197,7 +292,7 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
      */
     private void unRegisterListener(){
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mNotifyReceiver);
-        unregisterReceiver(mNotifyReceiver);
+        unregisterReceiver(musicActionReceiver);
         if(Build.VERSION.SDK_INT >= 21){
             try{
                 mediaSessionManager.removeOnActiveSessionsChangedListener(this);
@@ -217,9 +312,18 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
     class NotifyReceiver extends BroadcastReceiver{
         @Override
         public void onReceive(Context context, Intent intent) {
+            Log.i(TAG, "NotifyReceiver->收到广播:" + intent.getAction());
             processNotify();
         }
     }
+
+    class MusicActionReceiver extends BroadcastReceiver{
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.i(TAG, "MusicActionReceiver->收到广播:" + intent.getAction());
+        }
+    }
+
 
     private  MediaControllerCompat.Callback mediaCompactCallback = new MediaControllerCompat.Callback() {
         @Override
