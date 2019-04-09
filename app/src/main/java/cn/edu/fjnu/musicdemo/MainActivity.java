@@ -150,17 +150,18 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
 
 
     public MediaControllerCompat findMediaControl(MusicInfo musicInfo){
-        List<MediaController> mediaControllers = mediaSessionManager.getActiveSessions(mNotifyReceiveService);
-        for(MediaController controller : mediaControllers){
-            try{
+        try{
+            List<MediaController> mediaControllers = mediaSessionManager.getActiveSessions(mNotifyReceiveService);
+            for(MediaController controller : mediaControllers){
                 MediaControllerCompat controllerCompat = new MediaControllerCompat(this, MediaSessionCompat.Token.fromToken(controller.getSessionToken()));
                 if(musicInfo.getPkgName().equals(controllerCompat.getPackageName()))
                     return controllerCompat;
-            }catch (Exception e){
-                e.printStackTrace();
-            }
 
+            }
+        }catch (Exception e){
+            e.printStackTrace();
         }
+
         return null;
     }
 
@@ -217,11 +218,11 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
      */
     private void loadMusicControlAdapter(){
         if(Build.VERSION.SDK_INT >= 21){
-            List<MediaController> mediaControllers = mediaSessionManager.getActiveSessions(mNotifyReceiveService);
-            if(mediaControllers.size() > 0){
-                List<MusicInfo> musicInfos = new ArrayList<>();
-                for(MediaController controller : mediaControllers){
-                    try{
+            try{
+                List<MediaController> mediaControllers = mediaSessionManager.getActiveSessions(mNotifyReceiveService);
+                if(mediaControllers.size() > 0){
+                    List<MusicInfo> musicInfos = new ArrayList<>();
+                    for(MediaController controller : mediaControllers){
                         MediaControllerCompat controllerCompat = new MediaControllerCompat(this, MediaSessionCompat.Token.fromToken(controller.getSessionToken()));
                         MusicInfo itemMusicInfo = new MusicInfo();
                         String pkgName = controllerCompat.getPackageName();
@@ -241,13 +242,13 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
                             }
                         }
                         musicInfos.add(itemMusicInfo);
-                    }catch (Exception e){
-                        //no handle
-                        e.printStackTrace();
                     }
+                    mRvMusicBrowser.setAdapter(new ControlAdapter(this, musicInfos, this));
                 }
-                mRvMusicBrowser.setAdapter(new ControlAdapter(this, musicInfos, this));
+            }catch (Exception e){
+                e.printStackTrace();
             }
+
 
         }
 
