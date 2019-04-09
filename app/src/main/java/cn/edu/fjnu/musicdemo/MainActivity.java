@@ -1,14 +1,17 @@
 package cn.edu.fjnu.musicdemo;
+import android.app.Instrumentation;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
+import android.media.AudioManager;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.os.Build;
 import android.os.Handler;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.support.annotation.RequiresApi;
 import android.support.v4.content.LocalBroadcastManager;
@@ -94,59 +97,103 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
     }
 
     private void nexMusic(MusicInfo musicInfo){
-        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
-        if(controllerCompat != null){
-            Log.i(TAG, "nextMusic->pkgName:" + controllerCompat.getPackageName());
-            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN));
-            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_UP));
-            boolean isSucc = isDown && isUp;
-            if(!isSucc){
-                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+        if(isUseAudioManagerKey(musicInfo)){
+            Log.i(TAG, "使用audioManger key方式");
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT));
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT));
+         /*Intent downIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
+         downIntent.putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_NEXT));
+         sendOrderedBroadcast(downIntent, null);
+
+         Intent upIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
+         upIntent.putExtra(Intent.EXTRA_KEY_EVENT, new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT));
+         sendOrderedBroadcast(upIntent, null);*/
+
+         /*new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Instrumentation instrumentation = new Instrumentation();
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_NEXT);
+            }
+        }).start();*/
+
+        }else{
+            MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+            if(controllerCompat != null){
+                Log.i(TAG, "nextMusic->pkgName:" + controllerCompat.getPackageName());
+                boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_DOWN));
+                boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.ACTION_UP));
+                boolean isSucc = isDown && isUp;
+                if(!isSucc){
+                    MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
                 if(transportControls != null)
                     transportControls.skipToNext();
-            }
+                }
+             }
         }
     }
 
 
     private void lastMusic(MusicInfo musicInfo){
-        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
-        if(controllerCompat != null){
-            Log.i(TAG, "lastMusic->pkgName:" + controllerCompat.getPackageName());
-            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_DOWN));
-            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_UP));
-            boolean isSucc = isDown && isUp;
-            if(!isSucc){
-                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
-                if(transportControls != null)
-                    transportControls.skipToPrevious();
+        if(isUseAudioManagerKey(musicInfo)){
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PREVIOUS));
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS));
+        }else{
+            MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+            if(controllerCompat != null){
+                Log.i(TAG, "lastMusic->pkgName:" + controllerCompat.getPackageName());
+                boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_DOWN));
+                boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS, KeyEvent.ACTION_UP));
+                boolean isSucc = isDown && isUp;
+                if(!isSucc){
+                    MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+                    if(transportControls != null)
+                        transportControls.skipToPrevious();
+                }
             }
         }
+
     }
 
 
     private void playOrPause(MusicInfo musicInfo){
-        MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
-        boolean isPlay = musicInfo.isMusicState();
-        //int keyCode = isPlay ? KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
-        if(controllerCompat != null){
-            Log.i(TAG, "playOrPause->pkgName:" + controllerCompat.getPackageName());
-            boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN));
-            boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP));
-            boolean isSucc = isDown && isUp;
-            if(!isSucc){
-                MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
-                if(transportControls != null){
-                    if(isPlay)
-                        transportControls.pause();
-                    else
-                        transportControls.play();
-                }
+        if(isUseAudioManagerKey(musicInfo)){
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+            audioManager.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+        }else{
+            MediaControllerCompat controllerCompat = findMediaControl(musicInfo);
+            boolean isPlay = musicInfo.isMusicState();
+            if(controllerCompat != null){
+                Log.i(TAG, "playOrPause->pkgName:" + controllerCompat.getPackageName());
+                boolean isDown = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_DOWN));
+                boolean isUp = controllerCompat.dispatchMediaButtonEvent(new KeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.ACTION_UP));
+                boolean isSucc = isDown && isUp;
+                if(!isSucc){
+                    MediaControllerCompat.TransportControls transportControls = controllerCompat.getTransportControls();
+                    if(transportControls != null){
+                        if(isPlay)
+                            transportControls.pause();
+                        else
+                            transportControls.play();
+                    }
 
+                }
             }
         }
+
     }
 
+
+    private boolean isUseAudioManagerKey(MusicInfo musicInfo){
+        switch (musicInfo.getPkgName()){
+            case "com.tencent.qqmusic":
+                return true;
+        }
+        return false;
+    }
 
 
     public MediaControllerCompat findMediaControl(MusicInfo musicInfo){
