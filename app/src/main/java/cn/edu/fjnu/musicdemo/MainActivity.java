@@ -369,6 +369,7 @@ public class MainActivity extends AppCompatActivity implements MediaSessionManag
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.i(TAG, "MusicActionReceiver->收到广播:" + intent.getAction());
+            processNotify();
         }
     }
 
